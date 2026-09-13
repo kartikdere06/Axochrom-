@@ -1,0 +1,102 @@
+// Prisma schema for Axchrome store
+// For local dev this uses SQLite (zero setup). For production, switch the
+// datasource provider to "postgresql" and set DATABASE_URL to your Postgres
+// connection string (see README.md for the one-line change needed).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  phone        String?
+  address      String?
+  orders       Order[]
+  createdAt    DateTime @default(now())
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  products Product[]
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String
+  priceCents  Int
+  imageUrl    String
+  active      Boolean   @default(true)
+  category    Category? @relation(fields: [categoryId], references: [id])
+  categoryId  String?
+  variants    Variant[]
+  orderItems  OrderItem[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Variant {
+  id         String   @id @default(cuid())
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  String
+  label      String   // e.g. "Black / M"
+  sku        String   @unique
+  stock      Int      @default(0)
+  priceDelta Int      @default(0) // added to product priceCents, can be negative
+
+  orderItems OrderItem[]
+}
+
+model Order {
+  id                    String      @id @default(cuid())
+  stripeSessionId       String?     @unique
+  stripePaymentIntentId String?
+  customerEmail         String
+  customer              Customer?   @relation(fields: [customerId], references: [id])
+  customerId            String?
+  status                OrderStatus @default(PENDING)
+  totalCents             Int
+  shippingName          String?
+  shippingAddress       String?
+  items                 OrderItem[]
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  product    Product  @relation(fields: [productId], references: [id])
+  productId  String
+  variant    Variant? @relation(fields: [variantId], references: [id])
+  variantId  String?
+  quantity   Int
+  unitPriceCents Int
+  customPrintNote String?
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLED
+  CANCELLED
+}
